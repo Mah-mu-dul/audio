@@ -14,16 +14,21 @@ const port = process.env.PORT || 5000;
 // MongoDB connection URI
 const uri = process.env.MONGODB_URI || "mongodb+srv://workmahmudulhasan:1hBnMAl8eszIVMwb@cluster0.lphgiaq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
+let client;
 let collection;
 
 // Function to connect to the MongoDB database
 async function connectToMongoDB() {
-    const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+    client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
     try {
         await client.connect();
         console.log('MongoDB connected...');
         const db = client.db('test_db'); // Replace with your database name
         collection = db.collection('audio'); // Replace with your collection name
+
+        // Create text index on tags field
+        await collection.createIndex({ tags: "text" });
+
     } catch (err) {
         console.error(err);
         process.exit(1);
@@ -40,8 +45,7 @@ app.get('/search', async (req, res) => {
     if (!queryTag) return res.status(400).send('Query parameter "tag" is required');
 
     try {
-        const regex = new RegExp(queryTag, 'i');
-        const results = await collection.find({ tags: { $regex: regex } }).toArray();
+        const results = await collection.find({ tags: { $regex: queryTag, $options: 'i' } }).toArray();
         res.json(results);
     } catch (error) {
         console.error('Error finding documents:', error);
@@ -59,6 +63,8 @@ connectToMongoDB().then(() => {
 // Graceful shutdown
 process.on('SIGINT', async () => {
     console.log('Closing MongoDB connection...');
-    await client.close();
+    if (client) {
+        await client.close();
+    }
     process.exit(0);
 });
