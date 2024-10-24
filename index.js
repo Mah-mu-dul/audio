@@ -19,12 +19,12 @@ let collection;
 
 // Function to connect to the MongoDB database
 async function connectToMongoDB() {
-    client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+    client = new MongoClient(uri);
     try {
         await client.connect();
         console.log('MongoDB connected...');
-        const db = client.db('test_db'); // Replace with your database name
-        collection = db.collection('audio2'); // Replace with your collection name
+        const db = client.db('Actual_db'); // Replace with your database name
+        collection = db.collection('Fined_Laitu'); // Replace with your collection name
 
         // Create text index on tags field
         await collection.createIndex({ tags: "text" });
@@ -47,7 +47,23 @@ app.get('/search', async (req, res) => {
     try {
         // Create a regular expression for fuzzy matching
         const fuzzyQuery = new RegExp(queryTag.split('').join('.*'), 'i');
-        const results = await collection.find({ tag: { $regex: fuzzyQuery } }).toArray();
+        const results = await collection.find({
+            $or: [
+                { laituText: { $regex: fuzzyQuery } },
+                { engText: { $regex: fuzzyQuery } }
+            ]
+        }).toArray();
+        res.json(results);
+    } catch (error) {
+        console.error('Error finding documents:', error);
+        res.status(500).send('Error fetching data');
+    }
+});
+
+// Define the route to handle the GET request for all documents
+app.get('/getall', async (req, res) => {
+    try {
+        const results = await collection.find({}).toArray();
         res.json(results);
     } catch (error) {
         console.error('Error finding documents:', error);
@@ -58,8 +74,15 @@ app.get('/search', async (req, res) => {
 connectToMongoDB().then(() => {
     app.listen(port, () => {
         console.log(`Server running on port ${port}`);
+        console.log(`http://localhost:${port}`);
+        // console.log('MongoDB connection status:', client.isConnected()); // Corrected to client.isConnected()
     });
 });
+
+// Periodically check MongoDB connection status
+setInterval(() => {
+    // console.log('MongoDB connection status:', client.isConnected()); // Corrected to client.isConnected()
+}, 60000); // Check every 60 seconds
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
